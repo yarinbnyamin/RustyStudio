@@ -5,14 +5,17 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: [CHOOSE: Godot 4 / Unity / Unreal Engine 5]
-- **Language**: [CHOOSE: GDScript / C# / C++ / Blueprint]
+- **Engine**: none — custom web game: plain DOM + Canvas 2D (no Godot/Unity/Unreal)
+- **Language**: TypeScript 7 (strict) for the game; Rust for player-written content,
+  compiled to WebAssembly on the Rust Playground (`src/rust/wasm.ts`)
 - **Version Control**: Git with trunk-based development
-- **Build System**: [SPECIFY after choosing engine]
-- **Asset Pipeline**: [SPECIFY after choosing engine]
+- **Build System**: Vite 8 (`npm run build`), tests with Vitest 4 + jsdom (`npm test`)
+- **Asset Pipeline**: inline SVG and Web Audio synthesis; no binary assets
+- **Deploy**: GitHub Pages via `.github/workflows/deploy.yml` (Vite `base: "/RustyStudio/"`)
 
-> **Note**: Engine-specialist agents exist for Godot, Unity, and Unreal with
-> dedicated sub-specialists. Use the set matching your engine.
+> **Note**: The Godot/Unity/Unreal specialist agents do not apply to this
+> project. Use the generic programmer, design, UI and QA agents.
+> Design: `design/game-brief.md` (one page) and `design/rusty-studio-design.md` (full).
 
 ## Project Structure
 
