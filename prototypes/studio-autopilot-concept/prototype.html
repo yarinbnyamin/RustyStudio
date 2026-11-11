@@ -1,0 +1,178 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: does writing the Rust that runs the studio every day, then re-running the month to beat your best, feel like automating a company? -->
+<!-- Date: 2026-11-01 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prototype B: Studio Autopilot</title>
+<style>
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #10202f; color: #e8eef3; }
+  main { display: grid; grid-template-columns: minmax(320px, 500px) 1fr; gap: 20px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 1.2rem; margin: 0 0 4px; }
+  textarea { width: 100%; box-sizing: border-box; height: 380px; font: 14px/1.4 ui-monospace, Consolas, monospace; background: #0b1621; color: #e8eef3; border: 1px solid #2d4d69; border-radius: 6px; padding: 8px; tab-size: 4; }
+  button { background: #f5a623; color: #10202f; border: 0; border-radius: 6px; padding: 8px 14px; font-weight: 700; cursor: pointer; font: inherit; font-weight: 700; }
+  button.alt { background: #2d4d69; color: #e8eef3; }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { background: #0b1621; border-radius: 6px; padding: 8px; white-space: pre-wrap; font-size: 12px; max-height: 200px; overflow: auto; margin: 8px 0; }
+  .hint { color: #9fb3c4; font-size: 13px; }
+  .studio { background: #1c3348; border-radius: 10px; padding: 14px; }
+  .desks { font-size: 40px; letter-spacing: 12px; }
+  .bar { height: 14px; background: #0b1621; border-radius: 7px; overflow: hidden; margin: 2px 0 8px; }
+  .bar > div { height: 100%; background: #f5a623; transition: width .1s; }
+  .bar.morale > div { background: #4fb37a; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0; }
+  .stat { background: #0b1621; border-radius: 6px; padding: 6px 8px; } .stat b { display: block; font-size: 1.15rem; }
+  .result { background: #1e4a33; border-radius: 8px; padding: 10px; margin-top: 10px; display: none; }
+  .result.bad { background: #5a2430; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>🏢 Studio Autopilot: <code>autopilot.rs</code></h1>
+    <p class="hint">Your studio runs this Rust file <b>every day</b> of the month. Fix the 3 bugs so it compiles, then tweak the numbers and re-run to finish with more cash than your best.</p>
+    <textarea id="code" spellcheck="false"></textarea>
+    <p><button id="compile">▶ Compile</button> <span id="status" class="hint"></span></p>
+    <pre id="console"></pre>
+  </section>
+  <section class="studio">
+    <div class="desks" id="desks">🧑‍💻🧑‍💻</div>
+    <p class="hint" id="moodline">Juno and Mo are waiting for orders.</p>
+    <div>Crab Pong progress <span id="progText" class="hint"></span></div>
+    <div class="bar"><div id="prog" style="width:0%"></div></div>
+    <div>Team morale</div>
+    <div class="bar morale"><div id="morale" style="width:80%"></div></div>
+    <div class="stats">
+      <div class="stat">Day<b id="day">0</b></div>
+      <div class="stat">Cash<b id="cash">$5,000</b></div>
+      <div class="stat">Fans<b id="fans">0</b></div>
+      <div class="stat">Bugs<b id="bugs">0</b></div>
+    </div>
+    <p>
+      <button id="run" disabled>▶ Run the month</button>
+      <button id="speed" class="alt">Speed ×1</button>
+      <span class="hint" id="best"></span>
+    </p>
+    <pre id="log"></pre>
+    <div class="result" id="result"></div>
+  </section>
+</main>
+<script type="module">
+import { compileRust } from "../_shared/rust.js";
+
+const STARTER = `// The studio calls these functions every day.
+// Fix the 3 bugs so it compiles, then tune the numbers!
+
+// How long Juno and Mo work each day.
+// Bug: a new variable needs \`let\`.
+fn hours_per_day() -> i32 {
+    hours = 8;
+    hours
+}
+
+// How much cash to spend on marketing today.
+// Bug: \`budget\` changes, so it must be \`mut\`.
+fn marketing_budget(cash: i32) -> i32 {
+    let budget = cash / 20;
+    budget += 10;
+    budget
+}
+
+// What Crab Pong sells for, once it ships.
+// Bug: constants need a type, like \`: i32\`.
+const PRICE = 15;
+
+fn price() -> i32 {
+    PRICE
+}
+`;
+const FNS = [
+  { name: "hours_per_day", params: [], returns: "i32" },
+  { name: "marketing_budget", params: ["i32"], returns: "i32" },
+  { name: "price", params: [], returns: "i32" },
+];
+// Tuning (prototype: hardcoded on purpose)
+const DAYS = 30, START_CASH = 5000, SALARIES = 100, SHIP_AT = 250;
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;
+$("code").value = STARTER;
+$("code").addEventListener("keydown", (e) => {
+  if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText("    ", s, t.selectionEnd, "end"); }
+});
+
+let mod = null, best = null, running = false, speed = 1;
+$("speed").onclick = () => { speed = speed === 1 ? 4 : 1; $("speed").textContent = `Speed ×${speed}`; };
+$("compile").onclick = async () => {
+  $("compile").disabled = true;
+  const t0 = performance.now();
+  $("status").textContent = "Compiling on the real Rust compiler…";
+  const res = await compileRust($("code").value, FNS);
+  $("compile").disabled = false;
+  $("status").textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  if (!res.ok) { $("console").textContent = res.error; mod = null; $("run").disabled = true; return; }
+  mod = res;
+  $("console").textContent = `✅ autopilot.rs compiled. Today it would: work ${mod.call("hours_per_day")} h, spend ${fmt(mod.call("marketing_budget", START_CASH))} on marketing, price the game at ${fmt(mod.call("price"))}.`;
+  $("run").disabled = running;
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function moodFace(m) { return m > 75 ? "😀" : m > 50 ? "🙂" : m > 30 ? "😐" : "😫"; }
+
+$("run").onclick = async () => {
+  if (!mod || running) return;
+  running = true; $("run").disabled = true; $("compile").disabled = true;
+  const s = { cash: START_CASH, fans: 0, morale: 80, progress: 0, bugs: 0, shippedOn: 0, sold: 0 };
+  const lines = [];
+  const log = (t) => { lines.unshift(t); $("log").textContent = lines.slice(0, 9).join("\n"); };
+  $("result").style.display = "none";
+  let bankrupt = false;
+  for (let day = 1; day <= DAYS; day++) {
+    const hours = clamp(mod.call("hours_per_day"), 0, 16);
+    const spend = clamp(mod.call("marketing_budget", Math.round(s.cash)), 0, Math.max(0, s.cash));
+    s.morale = clamp(hours <= 8 ? s.morale + (8 - hours) * 1.5 + 1 : s.morale - (hours - 8) * 2.5, 0, 100);
+    if (s.morale < 30 && s.progress < SHIP_AT) s.bugs += 1;
+    s.fans += Math.round(Math.sqrt(spend) * 3);
+    s.cash -= SALARIES + spend;
+    let note = `Day ${day}: hours_per_day() → ${hours} · marketing_budget(${fmt(s.cash + SALARIES + spend)}) → ${fmt(spend)}`;
+    if (s.progress < SHIP_AT) {
+      s.progress += hours * 2 * (0.5 + s.morale / 200);
+      if (s.progress >= SHIP_AT) { s.shippedOn = day; note += ` · 🚀 Crab Pong ships at ${fmt(mod.call("price"))}!`; }
+    } else {
+      const p = Math.max(0, mod.call("price"));
+      const quality = Math.max(0.3, 1 - s.bugs * 0.05);
+      const buyers = Math.floor(s.fans * 0.1 * Math.max(0, 1 - p / 40) * quality);
+      s.cash += buyers * p; s.sold += buyers;
+      s.fans += Math.round(buyers * 0.3 * quality);
+      note += ` · 💰 ${buyers} sold`;
+    }
+    if (s.morale < 30) note += " · 😫 burnout bugs!";
+    log(note);
+    $("day").textContent = day; $("cash").textContent = fmt(s.cash); $("fans").textContent = s.fans.toLocaleString("en-US"); $("bugs").textContent = s.bugs;
+    $("prog").style.width = `${Math.min(100, (s.progress / SHIP_AT) * 100)}%`;
+    $("progText").textContent = s.shippedOn ? `(shipped day ${s.shippedOn}, ${s.sold} copies sold)` : `(${Math.round(s.progress)}/${SHIP_AT})`;
+    $("morale").style.width = `${s.morale}%`;
+    $("desks").textContent = hours === 0 ? "🪑🪑" : `${moodFace(s.morale)}💻 ${moodFace(s.morale)}💻`;
+    $("moodline").textContent = hours === 0 ? "Nobody is working…" : `Working ${hours} h/day, morale ${Math.round(s.morale)}%`;
+    if (s.cash < 0) { bankrupt = true; break; }
+    await sleep(320 / speed);
+  }
+  const el = $("result");
+  el.style.display = "block";
+  el.className = `result${bankrupt || !s.shippedOn ? " bad" : ""}`;
+  if (bankrupt) el.textContent = `💸 Bankrupt on day ${$("day").textContent}. Spend less, or ship sooner?`;
+  else {
+    const isBest = best === null || s.cash > best;
+    if (isBest) best = s.cash;
+    el.textContent = `${s.shippedOn ? `Shipped on day ${s.shippedOn}, sold ${s.sold} copies.` : "Crab Pong never shipped!"} Month-end cash: ${fmt(s.cash)}${isBest ? " 🏆 new best!" : ""}`;
+    $("best").textContent = `Best: ${fmt(best)}`;
+  }
+  running = false; $("run").disabled = false; $("compile").disabled = false;
+};
+</script>
+</body>
+</html>

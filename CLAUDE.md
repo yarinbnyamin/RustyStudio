@@ -5,7 +5,8 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: none — custom web game: plain DOM + Canvas 2D (no Godot/Unity/Unreal)
+- **Engine**: none — custom web game: three.js (3D studio scene) + DOM panels + Canvas 2D
+  textures (no Godot/Unity/Unreal)
 - **Language**: TypeScript 7 (strict) for the game; Rust for player-written content,
   compiled to WebAssembly on the Rust Playground (`src/rust/wasm.ts`)
 - **Version Control**: Git with trunk-based development

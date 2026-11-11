@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: which core loop should Rusty Studio build? A (code the game) vs B (automate the studio) -->
+<!-- Date: 2026-11-01 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rusty Studio prototypes</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #10202f; color: #e8eef3; padding: 24px 16px; }
+  main { max-width: 820px; margin: 0 auto; }
+  .pick { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .pick { grid-template-columns: 1fr; } }
+  a.box { display: block; background: #1c3348; border: 2px solid #2d4d69; border-radius: 12px; padding: 16px; color: inherit; text-decoration: none; }
+  a.box:hover { border-color: #f5a623; }
+  h2 { margin: 0 0 6px; } p { margin: 6px 0; color: #c7d4de; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🦀 Rusty Studio: pick a core loop</h1>
+  <p>Two throwaway prototypes of chapter 1 (Variables). Both compile your Rust on the real compiler. Play both, then pick one.</p>
+  <p><a class="box" href="crab-studio-3d-concept/prototype.html" style="border-color:#f5a623">
+    <b style="font-size:1.2rem">A2 · Crab Studio 3D (the winner, pivoted)</b>
+    <span style="display:block;color:#c7d4de">Crab Pong's loop inside a 3D studio: click a dev's computer to code, and watch the build on the studio TV.</span>
+  </a></p>
+  <p>Earlier round:</p>
+  <div class="pick">
+    <a class="box" href="crab-pong-concept/prototype.html">
+      <h2>A · Crab Pong</h2>
+      <p><b>Code the game.</b> Each card is a bug in your studio's first game. Fix the Rust, and the live Pong game changes in front of you.</p>
+      <p>Feels like: making a game, Game Dev Tycoon's project board.</p>
+    </a>
+    <a class="box" href="studio-autopilot-concept/prototype.html">
+      <h2>B · Studio Autopilot</h2>
+      <p><b>Automate the studio.</b> One Rust file runs your studio every day. Fix it, then tune hours, marketing and price to end the month richer.</p>
+      <p>Feels like: The Farmer Was Replaced, optimizing a program.</p>
+    </a>
+  </div>
+</main>
+</body>
+</html>

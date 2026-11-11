@@ -1,0 +1,8 @@
+{
+  "name": "crab-studio-3d-concept",
+  "private": true,
+  "description": "PROTOTYPE - NOT FOR PRODUCTION. Crab Pong's coding loop inside a 3D studio.",
+  "dependencies": {
+    "three": "0.186.1"
+  }
+}

@@ -1,0 +1,169 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: does fixing Rust lines that visibly change a live Crab Pong feel like building a game? -->
+<!-- Date: 2026-11-01 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prototype A: Crab Pong</title>
+<style>
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #10202f; color: #e8eef3; }
+  main { display: grid; grid-template-columns: minmax(320px, 460px) 1fr; gap: 20px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 1.2rem; margin: 0 0 4px; } h2 { font-size: 1rem; margin: 12px 0 4px; }
+  .cards { display: flex; gap: 6px; flex-wrap: wrap; }
+  .card { background: #1c3348; border: 2px solid #2d4d69; color: inherit; border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  .card.active { border-color: #f5a623; } .card.done { background: #1e4a33; }
+  textarea { width: 100%; box-sizing: border-box; height: 150px; font: 14px/1.4 ui-monospace, Consolas, monospace; background: #0b1621; color: #e8eef3; border: 1px solid #2d4d69; border-radius: 6px; padding: 8px; tab-size: 4; }
+  button.run { background: #f5a623; color: #10202f; border: 0; border-radius: 6px; padding: 8px 14px; font-weight: 700; cursor: pointer; }
+  button.run:disabled { opacity: .5; }
+  pre { background: #0b1621; border-radius: 6px; padding: 8px; min-height: 40px; white-space: pre-wrap; font-size: 12px; max-height: 220px; overflow: auto; }
+  canvas { background: #0b1621; border-radius: 8px; width: 100%; max-width: 640px; touch-action: none; }
+  .hint { color: #9fb3c4; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>🦀 Crab Pong: your studio's first game</h1>
+    <p class="hint">Each card is a bug in the game. Fix the Rust and press Compile: your function is compiled to WebAssembly and plugged into the game on the right.</p>
+    <div class="cards" id="cards"></div>
+    <h2 id="title"></h2>
+    <p id="task"></p>
+    <textarea id="code" spellcheck="false"></textarea>
+    <p><button class="run" id="compile">▶ Compile &amp; plug in</button> <span id="status" class="hint"></span></p>
+    <pre id="console"></pre>
+  </section>
+  <section>
+    <canvas id="court" width="640" height="400"></canvas>
+    <p class="hint">Move your crab paddle (left) with W/S, ↑/↓ or by dragging. Patches stay in until you reload.</p>
+  </section>
+</main>
+<script type="module">
+import { compileRust } from "../_shared/rust.js";
+
+const CARDS = [
+  {
+    id: "paddle", title: "Paddles don't move", topic: "let",
+    task: "The paddle speed is never declared. Rust needs `let` to create a variable. Try other speeds too!",
+    fn: { name: "paddle_speed", params: [], returns: "f32" },
+    starter: "fn paddle_speed() -> f32 {\n    speed = 6.0;\n    speed\n}\n",
+    check: (m) => { const v = m.call("paddle_speed"); return v > 0 && v <= 20 ? null : `paddle_speed() returned ${v}; pick something between 1 and 20.`; },
+  },
+  {
+    id: "score", title: "Score never changes", topic: "mut",
+    task: "Goals don't count! The function adds 1 to the score, but variables can't change unless they're `mut`.",
+    fn: { name: "score_after_goal", params: ["i32"], returns: "i32" },
+    starter: "fn score_after_goal(score: i32) -> i32 {\n    let total = score;\n    total += 1;\n    total\n}\n",
+    check: (m) => m.call("score_after_goal", 0) === 1 && m.call("score_after_goal", 4) === 5 ? null : "A goal should add exactly 1 point.",
+  },
+  {
+    id: "win", title: "Nobody ever wins", topic: "const",
+    task: "The match should end at WIN_SCORE points, but Rust constants always need a type, like `: i32`.",
+    fn: { name: "win_score", params: [], returns: "i32" },
+    starter: "const WIN_SCORE = 5;\n\nfn win_score() -> i32 {\n    WIN_SCORE\n}\n",
+    check: (m) => { const v = m.call("win_score"); return v >= 1 && v <= 21 ? null : `win_score() returned ${v}; pick 1 to 21.`; },
+  },
+];
+
+const $ = (id) => document.getElementById(id);
+const state = Object.fromEntries(CARDS.map((c) => [c.id, { code: c.starter, module: null, done: false }]));
+let current = CARDS[0];
+
+function renderCards() {
+  $("cards").replaceChildren(...CARDS.map((c) => {
+    const b = document.createElement("button");
+    b.className = `card${c === current ? " active" : ""}${state[c.id].done ? " done" : ""}`;
+    b.textContent = `${state[c.id].done ? "✅" : "🐞"} ${c.title}`;
+    b.onclick = () => { state[current.id].code = $("code").value; current = c; showCard(); };
+    return b;
+  }));
+}
+function showCard() {
+  $("title").textContent = `${current.title} (topic: ${current.topic})`;
+  $("task").textContent = current.task;
+  $("code").value = state[current.id].code;
+  $("console").textContent = "";
+  $("status").textContent = "";
+  renderCards();
+}
+$("code").addEventListener("keydown", (e) => {
+  if (e.key === "Tab") { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText("    ", s, t.selectionEnd, "end"); }
+});
+$("compile").onclick = async () => {
+  const card = current, st = state[card.id];
+  st.code = $("code").value;
+  $("compile").disabled = true;
+  const t0 = performance.now();
+  $("status").textContent = "Compiling on the real Rust compiler…";
+  const res = await compileRust(st.code, [card.fn]);
+  $("compile").disabled = false;
+  $("status").textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  if (!res.ok) { $("console").textContent = res.error; return; }
+  st.module = res;
+  const problem = card.check(res);
+  st.done = !problem;
+  $("console").textContent = problem ? `Compiled and plugged in, but: ${problem}` : "✅ Compiled and plugged into the game!";
+  flash(`Patch: ${card.fn.name}() is now YOUR code`);
+  renderCards();
+};
+
+// --- Crab Pong ---
+const cv = $("court"), g = cv.getContext("2d"), W = cv.width, H = cv.height, PH = 70;
+const keys = new Set();
+addEventListener("keydown", (e) => { if (document.activeElement !== $("code")) keys.add(e.key.toLowerCase()); });
+addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+let dragY = null;
+cv.addEventListener("pointermove", (e) => { if (e.buttons || e.pointerType === "touch") dragY = (e.offsetY / cv.clientHeight) * H; });
+cv.addEventListener("pointerup", () => (dragY = null));
+
+const game = { you: H / 2, ai: H / 2, bx: W / 2, by: H / 2, vx: 4, vy: 2, sYou: 0, sAi: 0, banner: "", bannerUntil: 0 };
+const live = (id) => state[id].module;
+const paddleSpeed = () => (live("paddle") ? live("paddle").call("paddle_speed") : 0);
+function flash(text) { game.banner = text; game.bannerUntil = performance.now() + 2500; }
+function serve(dir) { game.bx = W / 2; game.by = H / 2; game.vx = 4 * dir; game.vy = (Math.random() * 4 - 2) || 1.5; }
+function goal(scorer) {
+  const key = scorer === "you" ? "sYou" : "sAi";
+  if (live("score")) game[key] = live("score").call("score_after_goal", game[key]);
+  const target = live("win") ? live("win").call("win_score") : Infinity;
+  if (game[key] >= target) { flash(scorer === "you" ? "🏆 You win the match!" : "🤖 The AI wins this one"); game.sYou = game.sAi = 0; }
+  serve(scorer === "you" ? -1 : 1);
+}
+function step() {
+  const sp = paddleSpeed();
+  if (dragY !== null) game.you += Math.max(-sp, Math.min(sp, dragY - game.you));
+  if (keys.has("w") || keys.has("arrowup")) game.you -= sp;
+  if (keys.has("s") || keys.has("arrowdown")) game.you += sp;
+  game.ai += Math.max(-3.2, Math.min(3.2, game.by - game.ai));
+  game.you = Math.max(PH / 2, Math.min(H - PH / 2, game.you));
+  game.ai = Math.max(PH / 2, Math.min(H - PH / 2, game.ai));
+  game.bx += game.vx; game.by += game.vy;
+  if (game.by < 6 || game.by > H - 6) game.vy *= -1;
+  if (game.bx < 30 && game.bx > 18 && Math.abs(game.by - game.you) < PH / 2 + 6) { game.vx = Math.abs(game.vx) * 1.04; game.vy += (game.by - game.you) / 12; }
+  if (game.bx > W - 30 && game.bx < W - 18 && Math.abs(game.by - game.ai) < PH / 2 + 6) { game.vx = -Math.abs(game.vx) * 1.04; game.vy += (game.by - game.ai) / 12; }
+  if (game.bx < 0) goal("ai");
+  if (game.bx > W) goal("you");
+}
+function draw() {
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = "#2d4d69"; g.setLineDash([8, 10]); g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke(); g.setLineDash([]);
+  g.fillStyle = "#f5a623"; g.fillRect(14, game.you - PH / 2, 12, PH);
+  g.fillStyle = "#7fb3d5"; g.fillRect(W - 26, game.ai - PH / 2, 12, PH);
+  g.font = "28px system-ui"; g.textAlign = "center";
+  g.fillText("🦀", game.bx, game.by + 10);
+  g.fillStyle = "#e8eef3"; g.font = "bold 32px system-ui";
+  g.fillText(game.sYou, W / 2 - 50, 44); g.fillText(game.sAi, W / 2 + 50, 44);
+  g.font = "13px system-ui"; g.fillStyle = "#9fb3c4"; g.textAlign = "left";
+  const bugs = CARDS.filter((c) => !live(c.id)).map((c) => `🐞 ${c.title}`);
+  bugs.forEach((b, i) => g.fillText(b, 10, H - 12 - i * 18));
+  if (performance.now() < game.bannerUntil) {
+    g.fillStyle = "rgba(245,166,35,.92)"; g.fillRect(W / 2 - 220, H / 2 - 24, 440, 40);
+    g.fillStyle = "#10202f"; g.font = "bold 16px system-ui"; g.textAlign = "center"; g.fillText(game.banner, W / 2, H / 2 + 2);
+  }
+}
+(function loop() { step(); draw(); requestAnimationFrame(loop); })();
+showCard();
+</script>
+</body>
+</html>

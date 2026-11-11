@@ -1,6 +1,8 @@
 # Rusty Studio: chapter 1 demo design
 
-Status: approved in brainstorming, 2026-11-01. The one-page summary is `design/game-brief.md`.
+Status: approved in brainstorming on 2026-11-01. Updated on 2026-11-11 after the concept prototypes:
+the game lives in a 3D studio (see "Prototype outcome" below). The one-page summary is
+`design/game-brief.md`.
 
 Rusty Studio is the "game" fork of [PlayRusty](https://github.com/yarinbnyamin/PlayRusty). The classical
 PlayRusty is kept as is, on the `classical` branch and `classical-v1` tag of that repo. Rusty Studio
@@ -10,6 +12,23 @@ by the real compiler and runs the in-game game live.
 
 This document covers the **chapter 1 demo only**: Variables → Crab Pong.
 
+### Prototype outcome (2026-11-11)
+
+Three throwaway prototypes are recorded in `prototypes/index.md`:
+- **A, code the game:** loop CONFIRMED, but it read as a web tutorial, so it pivoted.
+- **B, automate the studio:** killed after losing the A/B pick.
+- **A2, the same loop inside a 3D studio in three.js:** CONFIRMED, PROCEED.
+
+What changes in this document:
+- **"Screens" become places in the studio.** The studio screen is the 3D room. A feature card is a
+  dev's computer, where the camera flies in and the editor sits on its screen. The Crab Pong preview
+  is the studio TV. The project board is the whiteboard. The next games are boxes on the shelf.
+- **Rules for production:**
+  - Show each bug's cause in the game (`speed = 0`), not only its symptom.
+  - Celebrations play only after the camera is back in the room view.
+  - Game logic runs on a fixed 60 Hz step; animations use elapsed time.
+  - Pixel ratio 1.5 or below, with 1024 shadow maps.
+
 ## 1. Concept
 
 You've just founded a garage game studio. Nobody on the team knows Rust yet. Each chapter is one game
@@ -18,8 +37,9 @@ Snake are out of scope here).
 
 ### Core loop of a chapter
 
-1. **Studio screen.** The garage with the team at their desks, a HUD with money and fans, and the
-   project board for Crab Pong: one card per feature.
+1. **The 3D studio.** The room with the team at their desks, each with a speech bubble naming the
+   bug they're stuck on. It also has a HUD with money and fans, the whiteboard project board (one
+   card per feature), the TV playing the current build, and the shelf of games.
 2. **Training.** Ferris, the studio's Rust mentor, teaches a topic to one dev. The lesson pages are
    written for that dev's background.
 3. **Feature card.** Assign a trained dev and write the Rust: the card text, a CodeMirror editor,
@@ -96,8 +116,9 @@ The numbers below are starting values. They all live in one balance table, not i
 ## 2. Architecture
 
 The stack is Vite 8, TypeScript 7 (strict), Vitest 4 + jsdom, CodeMirror 6 and plain DOM, the same as
-PlayRusty. Crab Pong uses plain Canvas 2D with no game library. The site is deployed to GitHub Pages
-with Vite `base: "/RustyStudio/"`.
+PlayRusty, plus **three.js** for the 3D studio. Crab Pong, the whiteboard and the idle monitor
+screens are drawn with Canvas 2D into textures shown in the scene. The site is deployed to GitHub
+Pages with Vite `base: "/RustyStudio/"`.
 
 The Claude Code Game Studios template (MIT, by Donchitos) supplies the process: its `/start`, brief,
 stories and `/dev-story` flow, the agents and the hooks. It ships Godot, Unity and Unreal specialists
@@ -123,10 +144,11 @@ engine-specific ones are skipped.
 |---|---|
 | `src/rust/wasm.ts` | Wraps player code in export shims, compiles it via the Playground `/compile` endpoint (target `wasm`, channel `stable`, crate type `cdylib`), strips the WAT `@producers`/`@custom` annotations, converts WAT to wasm with `wabt` (lazy-loaded on the first compile), and instantiates the module with no imports. |
 | `src/rust/checks.ts` | Calls the exported functions with each check's inputs and compares them to the expected values. The same code runs in the browser and in CI. |
-| `src/pong/` | Crab Pong: a pure `update(state, input, features)` plus `render(ctx, state)`. `features` holds an optional wasm function per card. While a card's function is missing, the game uses the card's fallback and shows that bug. W/S or the arrow keys or touch drag move your paddle; the other paddle is AI. |
+| `src/pong/` | Crab Pong: a pure fixed-step `update(state, input, features)` plus `render(ctx, state)` into the TV's canvas texture. `features` holds an optional wasm function per card. While a card's function is missing, the game uses the card's fallback and draws that bug's cause (for example `speed = 0.0`). In the room the game runs in attract mode; at the TV, W/S or the arrow keys move your paddle. |
 | `src/studio/` | Pure tycoon logic: team, training, card assignment, review scores, sales → money and fans. |
+| `src/scene/` | The three.js studio: room, desks, devs and speech bubbles, the TV, whiteboard and shelf, the camera rig (orbit, plus fly-in to a computer or the TV), picking, and laying a DOM panel over a monitor's projected screen. |
 | `src/content/chapters/01-crab-pong.ts` | Lessons per dev, quizzes, cards (topic, function, starter, solution, checks, hint, fallback), crunch tickets and the balance table. |
-| `src/ui/screens/` | Screens: studio, training, card (editor + live preview), crunch, ship/review. |
+| `src/ui/panels/` | DOM panels shown in the studio: the computer editor (on the monitor), training at the whiteboard, the crunch, and ship/review on the TV. |
 
 ### Player code to running game
 
@@ -163,7 +185,7 @@ There is no saving in the middle of the crunch, the same as classical PlayRusty.
 - A card needs a dev trained in its topic.
 - The crunch unlocks when all six cards are done.
 - **Ship it!** unlocks after the crunch is won.
-- The studio screen's **Play Crab Pong** button always plays the current build.
+- Clicking the studio TV always plays the current build.
 
 ## 3. Testing
 
